@@ -5,6 +5,9 @@ log() { printf >&2 %s\\n "$*" ; }
 
 jq_get() { printf %s "$json" | jq -r "$*" ; }
 jq_tget() { printf %s "$json" | jq -r ".tools[$i] | $*" ; }
+filter_string() {
+   sed -e "s/\(^\|[^%]\)%T/\1$(date +'%Y%m%d%H%M')/g;s/%%/%/g"
+}
 
 main() {
    set -eu
@@ -33,7 +36,7 @@ main() {
 
 toolbag() {
    local json="$(cat -)" # save for reuse
-   local target="$(jq_get .target)"
+   local target="$(jq_get .target | filter_string)"
    local targetar="$target.tar.gz"
    local tmpdir="$(mktemp -d -p "$PWD")"
    local workdir="$tmpdir/$target"
