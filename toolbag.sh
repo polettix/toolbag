@@ -3,10 +3,21 @@
 die() { log "$*" ; exit 1 ; }
 log() { printf >&2 %s\\n "$*" ; }
 
+get_git_id() {
+   local outcome
+   if outcome=$(git status --porcelain) && [ -z "$outcome" ] ; then
+      git rev-parse --short HEAD
+   else
+      printf 'dirty-%s' "$(date '+%Y%m%d%H%M')"
+   fi
+}
+
 jq_get() { printf %s "$json" | jq -r "$*" ; }
 jq_tget() { printf %s "$json" | jq -r ".tools[$i] | $*" ; }
 filter_string() {
-   sed -e "s/\(^\|[^%]\)%T/\1$(date +'%Y%m%d%H%M')/g;s/%%/%/g"
+   local ts="$(date '+%Y%m%d%H%M')"
+   local id="$(get_git_id)"
+   sed -e "s/\(^\|[^%]\)%T/\1$ts/g;s/\(^\|[^%]\)%I/\1$id/g;s/%%/%/g"
 }
 
 main() {
