@@ -12,6 +12,23 @@ get_git_id() {
    fi
 }
 
+init_git() {
+   local prefix="$(jq_tget '.prefix // "."')"
+   local tdir="$workdir/$prefix"
+   local gitignore="$(jq_tget '.gitignore // ""')"
+   local predir="$PWD"
+   cd "$tdir"
+   if [ -n "$gitignore" ] ; then
+      printf '%s\n' "$gitignore" > .gitignore
+   fi
+   git init
+   git commit --allow-empty -m Root
+   git add .
+   git commit -m 'Initial import'
+   git tag -am Start start
+   cd "$predir"
+}
+
 jq_get() { printf %s "$json" | jq -r "$*" ; }
 jq_tget() { printf %s "$json" | jq -r ".tools[$i] | $*" ; }
 filter_string() {
@@ -25,6 +42,7 @@ main() {
 
    local optname optval
    local clone=0
+   local has_input=0
    while [ $# -gt 0 ] ; do
       optname="$1"
       shift
@@ -34,14 +52,16 @@ main() {
             ;;
          (-i|--input)
             [ $# -gt 0 ] || die "no option for <$optname>"
-            exec < "$1"
+            [ "x$1" = 'x-' ] || exec < "$1"
             shift
+            has_input=1
             ;;
          (*)
             die "unknown option <$optname>"
             ;;
       esac
    done
+   [ "$has_input" -eq 1 ] || exec < 'custom.json'
    toolbag
 }
 
@@ -70,6 +90,9 @@ toolbag() {
          (git)
             add_git
             ;;
+         (git-init|git_init|init-git|init_git)
+            init_git
+            ;;
          (tar)
             cmd=_tar
             add_stuff
@@ -81,8 +104,9 @@ toolbag() {
       i=$((i + 1))
    done
 
-   printf %s\\n "$json" > "$workdir/toolbag-config.json"
+   printf %s\\n "$json" > "$workdir/.toolbag-config.json"
 
+   log "saving $target..."
    tar czf "$targetar" -C "$tmpdir" "$target"
    rm -rf "$tmpdir"
    printf %s\\n "$PWD/$targetar"
@@ -91,7 +115,7 @@ toolbag() {
 _cp() { cp "$1" "$2" ; }
 _tar() { tar xf "$1" -C "$2" ; }
 
-save_hash() { printf %s\\n "$*" >> "$workdir/toolbag-hashes.txt" ; }
+save_hash() { printf %s\\n "$*" >> "$workdir/.toolbag-hashes.txt" ; }
 
 add_dir() {
    local dirname="$(jq_tget '.dir // empty')"
