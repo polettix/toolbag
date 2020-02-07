@@ -17,16 +17,18 @@ init_git() {
    local tdir="$workdir/$prefix"
    local gitignore="$(jq_tget '.gitignore // ""')"
    local predir="$PWD"
-   cd "$tdir"
-   if [ -n "$gitignore" ] ; then
-      printf '%s\n' "$gitignore" > .gitignore
-   fi
-   git init
-   git commit --allow-empty -m Root
-   git add .
-   git commit -m 'Initial import'
-   git tag -am Start start
-   cd "$predir"
+   {
+      cd "$tdir"
+      if [ -n "$gitignore" ] ; then
+         printf '%s\n' "$gitignore" > .gitignore
+      fi
+      git init
+      git commit --allow-empty -m Root
+      git add .
+      git commit -m 'Initial import'
+      git tag -am Start start
+      cd "$predir"
+   } >&2
 }
 
 jq_get() { printf %s "$json" | jq -r "$*" ; }
