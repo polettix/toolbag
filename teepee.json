@@ -14,6 +14,10 @@
       {
          "type": "tar",
          "url": "https://github.com/polettix/teepee/archive/0.7.1.tar.gz"
+      },
+      {
+         "type": "dir",
+         "dir": "custom"
       }
    ]
 }
