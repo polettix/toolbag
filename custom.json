@@ -18,6 +18,10 @@
       {
          "type": "dir",
          "dir": "custom"
+      },
+      {
+         "type": "git-init",
+         "gitignore": "*.swp\n.toolbag-config.json\n"
       }
    ]
 }
