@@ -77,6 +77,7 @@ toolbag() {
 
    local n="$(jq_get '.tools | length')"
    local i=0
+   local tools=''
    local cmd
    while [ $i -lt $n ] ; do
       local type="$(jq_tget .type)"
@@ -106,12 +107,25 @@ toolbag() {
       i=$((i + 1))
    done
 
-   printf %s\\n "$json" > "$workdir/.toolbag-config.json"
+   new_json | jq . > "$workdir/.toolbag-config.json"
 
    log "saving $target..."
    tar czf "$targetar" -C "$tmpdir" "$target"
    rm -rf "$tmpdir"
    printf %s\\n "$PWD/$targetar"
+}
+
+new_json() {
+   local target="$(jq_get .target | filter_string)"
+   local date="$(TZ="'<+>'00" date '+%Y-%m-%d %H:%M:%S +0000')"
+
+   cat - <<END
+{
+   "target": "$target",
+   "generated": "$date",
+   "tools": [ $tools ]
+}
+END
 }
 
 _cp() { cp "$1" "$2" ; }
@@ -128,12 +142,38 @@ add_dir() {
    mkdir -p "$tdir"
    tar cC "$dirname" . | tar xC "$tdir"
 
-   save_hash "*:*" "$prefix" "$dirname"
+
+   local hash="$(
+      cd "$dirname"
+      local rev
+      if rev="$(git rev-parse HEAD 2>/dev/null)" ; then
+         printf 'git:'
+         local outcome
+         if outcome=$(git status --porcelain) && [ -z "$outcome" ] ; then
+            printf '%s\n' "$rev"
+         else
+            printf 'dirty/%s\n' "$rev"
+         fi
+
+      else
+         printf '*:*'
+      fi
+   )"
+   save_hash "$hash" "$prefix" "$dirname"
+   append_tool '' <<END
+{
+   "type": "$type",
+   "dir": "$dirname",
+   "hash": "$hash",
+   "prefix": "$prefix"
+}
+END
 }
 
 add_stuff() {
    local url="$(jq_tget '.url // empty')"
-   local filename="$(jq_tget '.file // empty')"
+   local ofilename="$(jq_tget '.file // empty')"
+   local filename="$ofilename"
    local origin="$filename"
    if [ -n "$url" ] ; then
       origin="$url"
@@ -149,6 +189,16 @@ add_stuff() {
 
    local hash="$(md5sum "$filename" | awk '{print $1}')"
    save_hash "md5:$hash" "$prefix" "$origin"
+
+   append_tool '' <<END
+{
+   "type": "$type",
+   "url": "$url",
+   "file": "$ofilename",
+   "hash": "$hash",
+   "prefix": "$prefix"
+}
+END
 }
 
 add_git() {
@@ -168,7 +218,8 @@ add_git() {
       git clone "$url" "$repodir"
    fi
 
-   local hash="$(cd "$repodir" && git rev-parse "$ref")"
+   local hash="$(jq_tget '.hash // empty')"
+   [ -n "$hash" ] || hash="$(cd "$repodir" && git rev-parse "$ref")"
 
    local prefix="$(jq_tget '.prefix // "."')"
    local tdir="$workdir/$prefix"
@@ -176,6 +227,27 @@ add_git() {
    (cd "$repodir" && git archive --format tar "$hash") | tar xC "$tdir"
 
    save_hash "sha1:$hash" "$prefix" "$url"
+
+   append_tool '' <<END
+{
+   "type": "$type",
+   "url": "$url",
+   "ref": "$ref",
+   "hash": "$hash",
+   "prefix": "$prefix"
+}
+END
+}
+
+append_tool() {
+   tools="$tools$(
+      [ "$i" -le 0 ] || printf ',\n'
+      if [ -n "$1" ] ; then
+         printf %s\n "$*"
+      else
+         cat -
+      fi
+   )"
 }
 
 main "$@"
